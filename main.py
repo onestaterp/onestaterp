@@ -8,7 +8,7 @@ import requests
 import telebot
 
 # ==================== زانیارییە سەرەکییەکان ====================
-BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
+BOT_TOKEN = "8874156704:AAF586Sk1Ui-65VPQJjKpVPoUN2Qej_-wco"
 GITHUB_TOKEN = "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"
 REPO_OWNER = "onestaterp"
 REPO_NAME = "onestaterp"
