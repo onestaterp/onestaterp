@@ -5,19 +5,16 @@ from flask import Flask, request
 import telebot
 import pymysql
 
-# ==================== زانیارییە سەرەکییەکان ====================
 BOT_TOKEN = "8874156704:AAFtjfqvfSK1lDm5pKRsCLLE9dyd7Y_pHGM"
 
-# زانیارییەکانی داتابەیسی MySQLـەکەت لە هۆستینگەر
 DB_HOST = "localhost"
 DB_USER = "u129582972_ewanaligian"
 DB_PASSWORD = "Ewan1999@"
 DB_NAME = "u129582972_ewanaligian"
 
-bot = telebot.TeleBot(BOT_TOKEN, thr"eaded=False)
+bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 app = Flask(__name__)
 
-# دروستکردنی خشتە لە داتابەیس ئەگەر بوونی نەبێت
 def init_db():
     try:
         connection = pymysql.connect(
@@ -41,7 +38,7 @@ def init_db():
             connection.commit()
         connection.close()
     except Exception as e:
-        print(f"Database Initialization Error: {e}")
+        print(f"Database Error: {e}")
 
 init_db()
 
@@ -58,9 +55,8 @@ def receive_message():
 
 @app.route('/')
 def index():
-    return "Bot with MySQL is active and running!"
+    return "Bot is running!"
 
-# فەنکشنەکانی گفتوگۆی تلگرام
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.reply_to(message, "بە خیر بێیت بۆ بۆتی بەڕێوەبردنی کلیلی VIP!\nتکایە ناوی کلیلەکەت بنێرە:")
@@ -68,10 +64,6 @@ def send_welcome(message):
 
 def get_key_name(message):
     key_name = message.text.strip()
-    if not key_name.isalnum():
-        bot.reply_to(message, "❌ هەڵە: ناوەکە دەبێت تەنها پیت و ژمارەی ئینگلیزی بێت.")
-        bot.register_next_step_handler(message, get_key_name)
-        return
     bot.reply_to(message, "باشە! ئێستا ماوەی کلیلەکە بە ڕۆژ بنووسە (ژمارە):")
     bot.register_next_step_handler(message, get_duration, key_name)
 
@@ -82,44 +74,33 @@ def get_duration(message, key_name):
         bot.reply_to(message, "❌ تکایە تەنها ژمارە بنووسە:")
         bot.register_next_step_handler(message, get_duration, key_name)
         return
-    bot.reply_to(message, "باشە! ئێستا کۆدی **HWID**ـی خۆت بنێرە (16 پیت/ژمارە):")
+    bot.reply_to(message, "باشە! ئێستا کۆدی HWID بنێرە (16 پیت):")
     bot.register_next_step_handler(message, process_hwid_and_save, key_name, duration_value)
 
 def process_hwid_and_save(message, key_name, duration_value):
     hwid = message.text.strip()
     if len(hwid) != 16:
-        bot.reply_to(message, "❌ هەڵە: کۆدی HWID دەبێت ڕێک 16 پیت بێت. دووبارە بنێرە:")
+        bot.reply_to(message, "❌ هەڵە: کۆدی HWID دەبێت ڕێک 16 پیت بێت:")
         bot.register_next_step_handler(message, process_hwid_and_save, key_name, duration_value)
         return
 
     final_hashed_key = generate_vip_key(hwid, key_name)
-    purchase_time = datetime.now(timezone.utc)
-    expiry_time = purchase_time + timedelta(days=duration_value)
-    expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
+    expiry_str = (datetime.now(timezone.utc) + timedelta(days=duration_value)).strftime("%Y-%m-%d %H:%M:%S")
     
-    # پاشەکەوتکردن لە داتابەیسی MySQL
     try:
         connection = pymysql.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            cursorclass=pymysql.cursors.DictCursor
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, cursorclass=pymysql.cursors.DictCursor
         )
         with connection.cursor() as cursor:
-            sql = "INSERT INTO vip_keys (key_name, vip_key, expiry, hwid) VALUES (%s, %s, %s, %s)"
-            cursor.execute(sql, (key_name, final_hashed_key, expiry_str, hwid))
+            cursor.execute("INSERT INTO vip_keys (key_name, vip_key, expiry, hwid) VALUES (%s, %s, %s, %s)", 
+                           (key_name, final_hashed_key, expiry_str, hwid))
             connection.commit()
         connection.close()
-        
-        bot.reply_to(message, f"✅ **پیرۆزە! کلیل لە داتابەیس پاشەکەوت بوو:**\n`{final_hashed_key}`", parse_mode="Markdown")
+        bot.reply_to(message, f"✅ **کلیل لە داتابەیس پاشەکەوت بوو:**\n`{final_hashed_key}`", parse_mode="Markdown")
     except Exception as e:
-        bot.reply_to(message, f"❌ هەڵە لە پاشەکەوتکردن لە داتابەیس: {str(e)}")
+        bot.reply_to(message, f"❌ هەڵە لە داتابەیس: {str(e)}")
 
 if __name__ == '__main__':
-    RENDER_URL = "https://onestaterp.onrender.com"
     bot.remove_webhook()
-    bot.set_webhook(url=f"{RENDER_URL}/{BOT_TOKEN}")
-    
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    bot.set_webhook(url=f"https://onestaterp.onrender.com/{BOT_TOKEN}")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
