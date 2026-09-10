@@ -1,20 +1,49 @@
 import os
-import base64
 import hashlib
 from datetime import datetime, timezone, timedelta
-import requests
 from flask import Flask, request
 import telebot
+import pymysql
 
 # ==================== زانیارییە سەرەکییەکان ====================
-BOT_TOKEN = "8874156704:AAFtjfqvfSK1lDm5pKRsCLLE9dyd7Y_pHGM"
-GITHUB_TOKEN = "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"
-REPO_OWNER = "onestaterp"
-REPO_NAME = "onestaterp"
-FILE_PATH = "key.txt"                            
+BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
+
+# زانیارییەکانی داتابەیسی MySQLـەکەت لە هۆستینگەر
+DB_HOST = "localhost"
+DB_USER = "u129582972_ewanaligian"
+DB_PASSWORD = "Ewan1999@"
+DB_NAME = "u129582972_ewanaligian"
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 app = Flask(__name__)
+
+# دروستکردنی خشتە لە داتابەیس ئەگەر بوونی نەبێت
+def init_db():
+    try:
+        connection = pymysql.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS vip_keys (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    key_name VARCHAR(255),
+                    vip_key VARCHAR(255),
+                    expiry VARCHAR(255),
+                    hwid VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            connection.commit()
+        connection.close()
+    except Exception as e:
+        print(f"Database Initialization Error: {e}")
+
+init_db()
 
 def generate_vip_key(hwid, key_name):
     raw_data = f"{hwid}-{key_name}-SecretSalt".encode('utf-8')
@@ -29,7 +58,7 @@ def receive_message():
 
 @app.route('/')
 def index():
-    return "Bot is active and running!"
+    return "Bot with MySQL is active and running!"
 
 # فەنکشنەکانی گفتوگۆی تلگرام
 @bot.message_handler(commands=['start'])
@@ -67,47 +96,27 @@ def process_hwid_and_save(message, key_name, duration_value):
     purchase_time = datetime.now(timezone.utc)
     expiry_time = purchase_time + timedelta(days=duration_value)
     expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
-    new_entry = f"{final_hashed_key} | Expires: {expiry_str} | HWID: {hwid}"
     
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        file_data = response.json()
-        sha = file_data['sha']
-        try:
-            existing_content = base64.b64decode(file_data['content']).decode('utf-8')
-        except Exception:
-            existing_content = ""
-            
-        lines = [line.strip() for line in existing_content.splitlines() if line.strip()]
-        lines.append(new_entry)
-        updated_content = "\n".join(lines)
-        encoded_content = base64.b64encode(updated_content.encode('utf-8')).decode('utf-8')
+    # پاشەکەوتکردن لە داتابەیسی MySQL
+    try:
+        connection = pymysql.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        with connection.cursor() as cursor:
+            sql = "INSERT INTO vip_keys (key_name, vip_key, expiry, hwid) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (key_name, final_hashed_key, expiry_str, hwid))
+            connection.commit()
+        connection.close()
         
-        data = {"message": f"Add key {key_name}", "content": encoded_content, "sha": sha}
-        update_response = requests.put(url, headers=headers, json=data)
-        
-        if update_response.status_code in [200, 201]:
-            bot.reply_to(message, f"✅ **پیرۆزە! کلیل دروست کرا:**\n`{final_hashed_key}`", parse_mode="Markdown")
-        else:
-            bot.reply_to(message, f"❌ هەڵە لە نوێکردنەوەی گیتهەب. کۆد: {update_response.status_code}")
-            
-    elif response.status_code == 404:
-        encoded_content = base64.b64encode(new_entry.encode('utf-8')).decode('utf-8')
-        data = {"message": "Create keys file", "content": encoded_content}
-        create_response = requests.put(url, headers=headers, json=data)
-        if create_response.status_code in [200, 201]:
-            bot.reply_to(message, f"✅ فایل دروست کرا و کلیل پاشەکەوت بوو:\n`{final_hashed_key}`", parse_mode="Markdown")
-        else:
-            bot.reply_to(message, f"❌ نەمتوانی فایل دروست بکەم. کۆد: {create_response.status_code}")
-    else:
-        bot.reply_to(message, f"❌ هەڵەی گیتهەب! کۆدی هەڵە: {response.status_code}")
+        bot.reply_to(message, f"✅ **پیرۆزە! کلیل لە داتابەیس پاشەکەوت بوو:**\n`{final_hashed_key}`", parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"❌ هەڵە لە پاشەکەوتکردن لە داتابەیس: {str(e)}")
 
 if __name__ == '__main__':
-    # ڕێکخستنی وێب‌هۆک بۆ ڕێگریکردن لە کێشەی 409
     RENDER_URL = "https://onestaterp.onrender.com"
     bot.remove_webhook()
     bot.set_webhook(url=f"{RENDER_URL}/{BOT_TOKEN}")
