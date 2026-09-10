@@ -1,0 +1,26 @@
+name: Auto Clean Expired Keys
+
+on:
+  schedule:
+    - cron: '0 * * * *' # ئەمە مانای ئەوەیە هەموو کاتژمێرێک جارێک ئەم پایتۆنە کار دەکات
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pymysql
+
+      - name: Run python script
+        run: |
+          python clean_keys.py
