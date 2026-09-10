@@ -7,8 +7,8 @@ from flask import Flask, request
 import telebot
 
 # ==================== زانیارییە سەرەکییەکان ====================
-BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
-GITHUB_TOKEN = "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"
+BOT_TOKEN = "8874156704:AAFtjfqvfSK1lDm5pKRsCLLE9dyd7Y_pHGM"
+GITHUB_TOKEN = "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"
 REPO_OWNER = "onestaterp"
 REPO_NAME = "onestaterp"
 FILE_PATH = "key.txt"                            
