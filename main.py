@@ -6,7 +6,7 @@ import telebot
 import pymysql
 
 # ==================== زانیارییە سەرەکییەکان ====================
-BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
+BOT_TOKEN = "8874156704:AAFtjfqvfSK1lDm5pKRsCLLE9dyd7Y_pHGM"
 
 # زانیارییەکانی داتابەیسی MySQLـەکەت لە هۆستینگەر
 DB_HOST = "localhost"
@@ -14,7 +14,7 @@ DB_USER = "u129582972_ewanaligian"
 DB_PASSWORD = "Ewan1999@"
 DB_NAME = "u129582972_ewanaligian"
 
-bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
+bot = telebot.TeleBot(BOT_TOKEN, thr"eaded=False)
 app = Flask(__name__)
 
 # دروستکردنی خشتە لە داتابەیس ئەگەر بوونی نەبێت
