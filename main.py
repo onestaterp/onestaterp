@@ -113,4 +113,8 @@ if __name__ == '__main__':
     server_thread = threading.Thread(target=run_web_server)
     server_thread.daemon = True
     server_thread.start()
+
+    print("Bot is running with Web Server...")
+    # لابردنی پاشماوەی پۆلینگەکەی پێشوو بۆ ڕێگریکردن لە هەڵەی 409
+    bot.remove_webhook()
     bot.infinity_polling(timeout=60, long_polling_timeout=60)
