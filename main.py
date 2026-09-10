@@ -1,39 +1,37 @@
 import os
 import base64
 import hashlib
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone, timedelta
 import requests
+from flask import Flask, request
 import telebot
 
 # ==================== زانیارییە سەرەکییەکان ====================
-BOT_TOKEN = "8874156704:AAF586Sk1Ui-65VPQJjKpVPoUN2Qej_-wco"
+BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
 GITHUB_TOKEN = "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"
 REPO_OWNER = "onestaterp"
 REPO_NAME = "onestaterp"
 FILE_PATH = "key.txt"                            
 
-bot = telebot.TeleBot(BOT_TOKEN)
-
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Bot is active and running!")
-    def log_message(self, format, *args):
-        return
-
-def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
-    server.serve_forever()
+bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
+app = Flask(__name__)
 
 def generate_vip_key(hwid, key_name):
     raw_data = f"{hwid}-{key_name}-SecretSalt".encode('utf-8')
     return hashlib.sha256(raw_data).hexdigest()[:16].upper()
 
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def receive_message():
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "!", 200
+
+@app.route('/')
+def index():
+    return "Bot is active and running!"
+
+# فەنکشنەکانی گفتوگۆی تلگرام
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.reply_to(message, "بە خیر بێیت بۆ بۆتی بەڕێوەبردنی کلیلی VIP!\nتکایە ناوی کلیلەکەت بنێرە:")
@@ -67,7 +65,6 @@ def process_hwid_and_save(message, key_name, duration_value):
 
     final_hashed_key = generate_vip_key(hwid, key_name)
     purchase_time = datetime.now(timezone.utc)
-    purchase_str = purchase_time.strftime("%Y-%m-%d %H:%M:%S")
     expiry_time = purchase_time + timedelta(days=duration_value)
     expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
     new_entry = f"{final_hashed_key} | Expires: {expiry_str} | HWID: {hwid}"
@@ -96,7 +93,7 @@ def process_hwid_and_save(message, key_name, duration_value):
         if update_response.status_code in [200, 201]:
             bot.reply_to(message, f"✅ **پیرۆزە! کلیل دروست کرا:**\n`{final_hashed_key}`", parse_mode="Markdown")
         else:
-            bot.reply_to(message, f"❌ هەڵە لە نوێکردنەوەی گیتهەب. کۆد: {update_response.status_code}\nوەڵام: {update_response.text}")
+            bot.reply_to(message, f"❌ هەڵە لە نوێکردنەوەی گیتهەب. کۆد: {update_response.status_code}")
             
     elif response.status_code == 404:
         encoded_content = base64.b64encode(new_entry.encode('utf-8')).decode('utf-8')
@@ -105,16 +102,15 @@ def process_hwid_and_save(message, key_name, duration_value):
         if create_response.status_code in [200, 201]:
             bot.reply_to(message, f"✅ فایل دروست کرا و کلیل پاشەکەوت بوو:\n`{final_hashed_key}`", parse_mode="Markdown")
         else:
-            bot.reply_to(message, f"❌ نەمتوانی فایل دروست بکەم. کۆد: {create_response.status_code}\nوەڵام: {create_response.text}")
+            bot.reply_to(message, f"❌ نەمتوانی فایل دروست بکەم. کۆد: {create_response.status_code}")
     else:
-        bot.reply_to(message, f"❌ هەڵەی گیتهەب! کۆدی هەڵە: {response.status_code}\nوەڵام: {response.text}")
+        bot.reply_to(message, f"❌ هەڵەی گیتهەب! کۆدی هەڵە: {response.status_code}")
 
 if __name__ == '__main__':
-    server_thread = threading.Thread(target=run_web_server)
-    server_thread.daemon = True
-    server_thread.start()
-
-    print("Bot is running with Web Server...")
-    # لابردنی پاشماوەی پۆلینگەکەی پێشوو بۆ ڕێگریکردن لە هەڵەی 409
+    # ڕێکخستنی وێب‌هۆک بۆ ڕێگریکردن لە کێشەی 409
+    RENDER_URL = "https://onestaterp.onrender.com"
     bot.remove_webhook()
-    bot.infinity_polling(timeout=60, long_polling_timeout=60)
+    bot.set_webhook(url=f"{RENDER_URL}/{BOT_TOKEN}")
+    
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
