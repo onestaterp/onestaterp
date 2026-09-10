@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 # زانیارییە سەرەکییەکان
 TELEGRAM_BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 REPO_OWNER = "onestaterp"
 REPO_NAME = "onestaterp"
 FILE_PATH = "Key.txt"
