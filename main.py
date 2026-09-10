@@ -1,237 +1,152 @@
-
 import os
+import base64
+import hashlib
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime, timezone, timedelta
 import requests
 import telebot
-from telebot import types
-import hashlib
-import base64
-from datetime import datetime, timedelta, timezone
 
-# زانیارییە سەرەکییەکان
-TELEGRAM_BOT_TOKEN = "8874156704:AAEJWnsJcUcAxvBbX4wyjo6luQHr4MofscI"
-GITHUB_TOKEN = "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"
-REPO_OWNER = "onestaterp"
-REPO_NAME = "onestaterp"
-FILE_PATH = "Key.txt"
-CHANNEL_USERNAME = "@Ewan1999Kurd"
+# ==================== زانیارییە سەرەکییەکان (گۆڕین پێویستە) ====================
+BOT_TOKEN = "لێرە_تۆکنی_بۆتەکەی_تلگرام_دابنە"
+GITHUB_TOKEN = "لێرە_تۆکنی_نوێی_گیتهەب_دابنە"
+REPO_OWNER = "لێرە_ناوی_هەژماری_گیتهەبت_دابنە"      # بۆ نموونە: onestaterp
+REPO_NAME = "لێرە_ناوی_ڕێپۆزیتۆری_دابنە"          # بۆ نموونە: onestaterp
+FILE_PATH = "keys.txt"                            # ناوی ئەو فایلەی کە کلیلەکانی تێدا پاشەکەوت دەکرێن
 
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# --- وێب سەوڤەرێکی بچووک بۆ ڕێندەر (بۆ گرتنی پۆرت) ---
+# ==================== وێب سەوڤەر بۆ ڕێندەر (Render Uptime) ====================
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(b"Bot is active and running!")
 
+    def log_message(self, format, *args):
+        return  # بۆ ئەوەی لۆگی وێب سەوڤەر ناوی لۆگی بۆتەکە تێک نەدات
+
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
-    print(f"Web server running on port {port}")
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
-# ----------------------------------------------------
 
-# فەنکشن بۆ دروستکردنی SHA256 Hash
+# ==================== فەنکشنەکانی دروستکردنی کلیل ====================
 def generate_vip_key(hwid, key_name):
-    raw_string = f"605348db2ce3c473{key_name}EWN2026VIP"
-    sha256_output = hashlib.sha256(raw_string.encode('utf-8')).hexdigest()
-    return sha256_output
+    raw_data = f"{hwid}-{key_name}-SecretSalt".encode('utf-8')
+    return hashlib.sha256(raw_data).hexdigest()[:16].upper()
 
-# فەرمانی /start و پشکنینی چەناڵ
+# ==================== کۆدی سەرەکی بۆت و بەستنەوە بە گیتهەب ====================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    user_id = message.from_user.id
-    user_lang = message.from_user.language_code
-    
-    try:
-        chat_member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        if chat_member.status in ['left', 'kicked']:
-            markup = types.InlineKeyboardMarkup()
-            btn_channel = types.InlineKeyboardButton(text="📢 جۆینی چەناڵ بکە", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")
-            btn_check = types.InlineKeyboardButton(text="✅ پشکنین / دووبارە پشکەنەوە", callback_data="check_sub")
-            markup.add(btn_channel)
-            markup.add(btn_check)
-            
-            bot.reply_to(
-                message, 
-                f"سڵاو! (زمانت: {user_lang})\nبۆ بەکارهێنانی ئەم بۆتە، دەبێت سەرەتا لە چەناڵەکەمان ئەندام بیت:\n{CHANNEL_USERNAME}\n\nتکایە جۆین بکە و پاشان دوگمەی پشکنین بگرە.", 
-                reply_markup=markup
-            )
-            return
-    except Exception as e:
-        print(f"Error checking channel: {e}")
+    bot.reply_to(message, "بە خیر بێیت بۆ بۆتی بەڕێوەبردنی کلیلی VIP!\nتکایە ناوی کلیلەکەت بنێرە:")
+    bot.register_next_step_handler(message, get_key_name)
 
-    show_duration_menu(message.chat.id)
-
-# نیشاندانی لیستی ماوەکان
-def show_duration_menu(chat_id):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btn_1min = types.InlineKeyboardButton(text="⏱ 1 خولەک (تاقیکردنەوە)", callback_data="dur_1min")
-    btn_1d = types.InlineKeyboardButton(text="📅 1 ڕۆژ (24 کاتژمێر)", callback_data="dur_1")
-    btn_7d = types.InlineKeyboardButton(text="📅 7 ڕۆژ (هەفتەیەک)", callback_data="dur_7")
-    btn_15d = types.InlineKeyboardButton(text="📅 15 ڕۆژ", callback_data="dur_15")
-    btn_30d = types.InlineKeyboardButton(text="📅 30 ڕۆژ (مانگێک)", callback_data="dur_30")
-    markup.add(btn_1min, btn_1d, btn_7d, btn_15d, btn_30d)
-    
-    bot.send_message(
-        chat_id, 
-        "⭐ فەرموو ماوەی کلیلەکەت هەڵبژێرە لە ڕێگەی دوگمەکانی خوارەوە:", 
-        reply_markup=markup
-    )
-
-# پشکنینی دووبارەی جۆین بوون
-@bot.callback_query_handler(func=lambda call: call.data == "check_sub")
-def callback_check_sub(call):
-    user_id = call.from_user.id
-    try:
-        chat_member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        if chat_member.status in ['left', 'kicked']:
-            bot.answer_callback_query(call.id, "تۆ هێشتا جۆینی چەناڵ نەکردووە!", show_alert=True)
-        else:
-            bot.answer_callback_query(call.id, "سوپاس، جۆین بوونت سەرکەوتوو بوو!")
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            show_duration_menu(call.message.chat.id)
-    except Exception as e:
-        bot.answer_callback_query(call.id, "هەڵەیەک ڕووی دا، دووبارە هەوڵ بدەرەوە.", show_alert=True)
-
-# وەرگرتنی ماوەی هەڵبژاردراو
-@bot.callback_query_handler(func=lambda call: call.data.startswith("dur_"))
-def handle_duration_selection(call):
-    data_val = call.data.split("_")[1]
-    
-    if data_val == "1min":
-        is_minutes = True
-        duration_value = 1
-        duration_text = "1 خولەک"
-    else:
-        is_minutes = False
-        duration_value = int(data_val)
-        duration_text = f"{duration_value} ڕۆژ"
-
-    bot.answer_callback_query(call.id, f"ماوەی {duration_text} هەڵبژێرا.")
-    
-    msg = bot.send_message(
-        call.message.chat.id, 
-        f"✅ ماوەی دیاریکراو: **{duration_text}**.\n\n"
-        "⚠️ **تێبینی:** ناوی کلیل دەبێت تەنها پیتە ئینگلیزیەکان و **بە کەپیتەڵ (Uppercase)** بێت (نموونە: `EWAN`).\n\n"
-        "تکایە **ناوی کلیلەکەت** بنێرە:", 
-        parse_mode="Markdown"
-    )
-    bot.register_next_step_handler(msg, get_key_name, duration_value, is_minutes)
-
-# وەرگرتنی ناوی کلیل
-def get_key_name(message, duration_value, is_minutes):
+def get_key_name(message):
     key_name = message.text.strip()
-    
-    if not key_name.isupper() or not key_name.isalpha():
-        msg = bot.reply_to(
-            message, 
-            "❌ **هەڵە:** ناوەکە هەڵەیە!\n"
-            "• دەبێت تەنها پیتە ئینگلیزیەکان بن.\n"
-            "• دەبێت هەموو پیتەکان **کەپیتەڵ (Uppercase)** بن.\n\n"
-            "تکایە ناوەکە دووبارە بە ڕاستی بنێرە:",
-            parse_mode="Markdown"
-        )
-        bot.register_next_step_handler(msg, get_key_name, duration_value, is_minutes)
+    if not key_name.isalnum():
+        bot.reply_to(message, "❌ هەڵە: ناوەکە دەبێت تەنها پیت و ژمارەی ئینگلیزی بێت.")
+        bot.register_next_step_handler(message, get_key_name)
         return
 
-    msg = bot.reply_to(message, "باشە! ئێستا کۆدی **HWID**ـی خۆت بنێرە (دەبێت **ڕێک 16 پیت/ژمارە** بێت):")
-    bot.register_next_step_handler(msg, process_hwid_and_save, key_name, duration_value, is_minutes)
+    bot.reply_to(message, "باشە! ئێستا ماوەی کلیلەکە هەڵبژێرە (بۆ نموونە: 30 بۆ ڕۆژ، یان 60 بۆ خولەک):")
+    bot.register_next_step_handler(message, get_duration, key_name)
 
-# وەرگرتنی HWID و پاشەکەوتکردن لە گیتهەب
+def get_duration(message, key_name):
+    try:
+        duration_value = int(message.text.strip())
+    except ValueError:
+        bot.reply_to(message, "❌ تکایە تەنها ژمارە بنووسە:")
+        bot.register_next_step_handler(message, get_duration, key_name)
+        return
+
+    bot.reply_to(message, "باشە! ئێستا کۆدی **HWID**ـی خۆت بنێرە (دەبێت پێک هاتبێت لە 16 پیت/ژمارە):")
+    bot.register_next_step_handler(message, process_hwid_and_save, key_name, duration_value, False)
+
 def process_hwid_and_save(message, key_name, duration_value, is_minutes):
     hwid = message.text.strip()
     
-    if len(hwid) != 16 or not hwid.isalnum():
-        msg = bot.reply_to(
-            message, 
-            "❌ **هەڵە:** کۆدی HWID هەڵەیە!\n"
-            "• دەبێت **ڕێک 16** پیت یان ژمارە بێت.\n"
-            "• تەنها پیت و ژمارە قبوڵ دەکرێت.\n\n"
-            "تکایە کۆدی ڕاستەقینەی HWID دووبارە بنێرەوە:",
+    if len(hwid) != 16:
+        bot.reply_to(
+            message,
+            "❌ **هەڵە:** کۆدی HWID دەبێت **ڕێک 16 پیت/ژمارە** بێت!\n\nتکایە کۆدی ڕاستەقینەی HWID دووبارە بنێرەوە:",
             parse_mode="Markdown"
         )
-        bot.register_next_step_handler(msg, process_hwid_and_save, key_name, duration_value, is_minutes)
+        bot.register_next_step_handler(message, process_hwid_and_save, key_name, duration_value, is_minutes)
         return
 
     final_hashed_key = generate_vip_key(hwid, key_name)
     
     purchase_time = datetime.now(timezone.utc)
     purchase_str = purchase_time.strftime("%Y-%m-%d %H:%M:%S")
-    
-    if is_minutes:
-        expiry_time = purchase_time + timedelta(minutes=duration_value)
-    else:
-        expiry_time = purchase_time + timedelta(days=duration_value)
-        
+    expiry_time = purchase_time + timedelta(days=duration_value)
     expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
-    
-    new_entry = f"{final_hashed_key} | Expires: {expiry_str}"
+        
+    new_entry = f"{final_hashed_key} | Expires: {expiry_str} | HWID: {hwid}"
     
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
+    # خوێندنەوەی فایلەکە لە گیتهەب
     response = requests.get(url, headers=headers)
+    
     if response.status_code == 200:
         file_data = response.json()
         sha = file_data['sha']
         
-        existing_content = base64.b64decode(file_data['content']).decode('utf-8')
-        lines = existing_content.splitlines()
-        
-        valid_lines = []
-        now = datetime.now(timezone.utc)
-        
-        for line in lines:
-            line_stripped = line.strip()
-            if not line_stripped:
-                continue
+        try:
+            existing_content = base64.b64decode(file_data['content']).decode('utf-8')
+        except Exception:
+            existing_content = ""
             
-            if " | Expires: " in line_stripped:
-                try:
-                    parts = line_stripped.split(" | Expires: ")
-                    exp_str = parts[1].strip()
-                    exp_time = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                    
-                    if exp_time > now:
-                        valid_lines.append(line_stripped)
-                except Exception as e:
-                    print(f"Error parsing line: {e}")
-            else:
-                continue
-                    
+        lines = existing_content.splitlines()
+        valid_lines = [line.strip() for line in lines if line.strip()]
+        
         valid_lines.append(new_entry)
         updated_content = "\n".join(valid_lines)
         
         encoded_content = base64.b64encode(updated_content.encode('utf-8')).decode('utf-8')
         
         data = {
-            "message": f"Clean expired keys and add new for {key_name}",
+            "message": f"Add new VIP key for {key_name}",
             "content": encoded_content,
             "sha": sha
         }
         
+        # ناردنەوەی فایلە نوێکراوەکە بۆ گیتهەب
         update_response = requests.put(url, headers=headers, json=data)
-        if update_response.status_code == 200:
+        
+        if update_response.status_code in [200, 201]:
             bot.reply_to(
                 message, 
                 f"✅ **پیرۆزە! کلیلەکەت بە سەرکەوتوویی دروست کرا.**\n\n"
-                f"💻 **کۆدی HWIDی داخڵکراو:**\n`{hwid}`\n\n"
-                f"🏷 **ناوی کلیل:** `{key_name}`\n\n"
+                f"💻 **HWID:** `{hwid}`\n"
+                f"🏷 **ناوی کلیل:** `{key_name}`\n"
                 f"🔑 **کلیلەکەت (Hash Key):**\n`{final_hashed_key}`\n\n"
-                f"📅 **بەرواری کڕین:** {purchase_str}\n"
-                f"⏳ **بەرواری بەسەرچوون:** {expiry_str}",
+                f"⏳ **بەسەرچوون:** {expiry_str}",
                 parse_mode="Markdown"
             )
         else:
-            bot.reply_to(message, "❌ هەەڵەیەک ڕووی دا لە نوێکردنەوەی فایلەکە لە گیتهەب.")
+            bot.reply_to(message, f"❌ هەەڵە لە نوێکردنەوەی گیتهەب: {update_response.status_code}")
+    
+    elif response.status_code == 404:
+        # ئەگەر فایلەکە بوونی نەبوو، خۆکارانە دروستی دەکات
+        encoded_content = base64.b64encode(new_entry.encode('utf-8')).decode('utf-8')
+        data = {
+            "message": "Create keys file and add first key",
+            "content": encoded_content
+        }
+        create_response = requests.put(url, headers=headers, json=data)
+        if create_response.status_code in [200, 201]:
+            bot.reply_to(message, f"✅ فایل دروست کرا و کلیلەکە پاشەکەوت بوو:\n`{final_hashed_key}`", parse_mode="Markdown")
+        else:
+            bot.reply_to(message, "❌ نەمتوانی فایلەکە لە گیتهەب دروست بکەم.")
     else:
-        bot.reply_to(message, "❌ ناتوانم پەیوەندی بە گیتهەبەوە بکەم.")
+        bot.reply_to(message, f"❌ ناتوانم پەیوەندی بە گیتهەبەوە بکەم (کۆدی هەڵە: {response.status_code}). دڵنیابە لە تووکن و ناوی ڕێپۆزیتۆری.")
 
 if __name__ == '__main__':
-    # دەستپێکردنی وێب سەوڤەر لە تەنیشت بۆتەوە (بە پرۆسەیەک کە پێشلی پۆرت نەگرێت)
+    # هەڵکردنی وێب سەوڤەر لە پۆشتی سەرەکی بۆتدا
     server_thread = threading.Thread(target=run_web_server)
     server_thread.daemon = True
     server_thread.start()
