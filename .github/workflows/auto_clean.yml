@@ -2,7 +2,7 @@ name: Auto Clean Expired Keys every 5 minutes
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # پشکنین دەکات و نوێ دەبێتەوە هەر ٥ خولەک جارێک
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -40,12 +40,10 @@ jobs:
           )
           cursor = db.cursor()
 
-          # سڕینەوەی کلیلە بەسەرچووەکان لە داتابەیس بە بەکارهێنانی backticks بۆ خشتەی keys
-          cursor.execute('DELETE FROM \`keys\` WHERE expires_at < NOW()')
+          cursor.execute('DELETE FROM `keys` WHERE expires_at < NOW()')
           db.commit()
 
-          # هێنانی کلیلە کاراکانی ماوە بۆ نوێکردنەوەی Key.txt
-          cursor.execute('SELECT sha256_key FROM \`keys\` WHERE expires_at >= NOW()')
+          cursor.execute('SELECT sha256_key FROM `keys` WHERE expires_at >= NOW()')
           active_keys = cursor.fetchall()
 
           with open('Key.txt', 'w') as f:
@@ -62,4 +60,4 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add Key.txt
-          git diff --quiet && git diff --staged --quiet || (git commit -m 'Auto-clean expired keys every 5 minutes [skip ci]' && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m 'Auto-clean expired keys [skip ci]' && git push)
