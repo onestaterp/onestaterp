@@ -9,11 +9,9 @@ db = mysql.connector.connect(
 )
 cursor = db.cursor()
 
-# سڕینەوەی کلیلە بەسەرچووەکان
 cursor.execute('DELETE FROM `keys` WHERE expires_at < NOW()')
 db.commit()
 
-# هێنانی کلیلە کاراکان بۆ فایلی Key.txt
 cursor.execute('SELECT sha256_key FROM `keys` WHERE expires_at >= NOW()')
 active_keys = cursor.fetchall()
 
