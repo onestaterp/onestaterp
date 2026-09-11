@@ -1,26 +1,60 @@
-name: Auto Clean Expired Keys
+name: Auto Clean Expired Keys from Key.txt
 
 on:
   schedule:
-    - cron: '0 * * * *' # ئەمە مانای ئەوەیە هەموو کاتژمێرێک جارێک ئەم پایتۆنە کار دەکات
+    - cron: '0 * * * *' # هەر کاتژمێرێک جارێک پشکنین دەکات
   workflow_dispatch:
 
 jobs:
-  run-script:
+  clean:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
       - name: Install dependencies
         run: |
-          pip install pymysql
+          pip install mysql-connector-python
 
-      - name: Run python script
+      - name: Run Cleanup Script
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
-          python clean_keys.py
+          python -c "
+          import mysql.connector
+          import os
+
+          db = mysql.connector.connect(
+              host=os.getenv('DB_HOST'),
+              user=os.getenv('DB_USER'),
+              password=os.getenv('DB_PASS'),
+              database=os.getenv('DB_NAME')
+          )
+          cursor = db.cursor()
+
+          cursor.execute('SELECT sha256_key FROM keys WHERE expires_at >= NOW()')
+          active_keys = cursor.fetchall()
+
+          with open('Key.txt', 'w') as f:
+              for key in active_keys:
+                  f.write(key[0] + '\n')
+
+          cursor.close()
+          db.close()
+          print('Key.txt updated successfully!')
+          "
+
+      - name: Commit and push changes if Key.txt updated
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add Key.txt
+          git diff --quiet && git diff --staged --quiet || (git commit -m 'Auto-clean expired keys [skip ci]' && git push)
