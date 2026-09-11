@@ -40,24 +40,24 @@ jobs:
           )
           cursor = db.cursor()
 
-          cursor.execute('DELETE FROM \`keys\` WHERE expires_at < NOW()')
+          cursor.execute('DELETE FROM keys WHERE expires_at < NOW()')
           db.commit()
 
-          cursor.execute('SELECT sha256_key FROM \`keys\` WHERE expires_at >= NOW()')
+          cursor.execute('SELECT sha256_key FROM keys WHERE expires_at >= NOW()')
           active_keys = cursor.fetchall()
 
           with open('Key.txt', 'w') as f:
               for key in active_keys:
-                  f.write(key[0] + '\n')
+                  f.write(str(key[0]) + '\n')
 
           cursor.close()
           db.close()
-          print('Database cleaned and Key.txt updated successfully!')
+          print('Done')
           "
 
-      - name: Commit and push changes if Key.txt updated
+      - name: Commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add Key.txt
-          git diff --quiet && git diff --staged --quiet || (git commit -m 'Auto-clean expired keys [skip ci]' && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m 'Update Key.txt [skip ci]' && git push)
